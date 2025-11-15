@@ -1,0 +1,74 @@
+name: CI-CD Pipeline - HomeApplience
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+env:
+  DOCKER_USERNAME: vanshp17
+  BACKEND_IMAGE: vanshp17/home-applience-backend
+  FRONTEND_IMAGE: vanshp17/home-applience-frontend
+  VM_USER: azureuser
+  VM_HOST: ${{ secrets.VM_HOST }}
+  VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+
+jobs:
+  build-scan-push-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: DockerHub Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Backend Image
+        run: |
+         docker build -t backend -f docker/backend.Dockerfile .
+
+
+      - name: Build Frontend Image
+        run: |
+          docker build -t ${{ env.FRONTEND_IMAGE }}:latest \
+          -f docker/frontend.Dockerfile ./app/electromart-frontend
+
+      - name: Scan Backend Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.BACKEND_IMAGE }}:latest
+          format: 'table'
+          exit-code: '0'
+
+      - name: Scan Frontend Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.FRONTEND_IMAGE }}:latest
+          format: 'table'
+          exit-code: '0'
+
+      - name: Push Backend Image
+        run: docker push ${{ env.BACKEND_IMAGE }}:latest
+
+      - name: Push Frontend Image
+        run: docker push ${{ env.FRONTEND_IMAGE }}:latest
+
+      - name: Deploy on Azure VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ env.VM_HOST }}
+          username: ${{ env.VM_USER }}
+          key: ${{ env.VM_SSH_KEY }}
+          script: |
+            sudo docker pull ${BACKEND_IMAGE}:latest
+            sudo docker pull ${FRONTEND_IMAGE}:latest
+
+            sudo docker stop backend || true && sudo docker rm backend || true
+            sudo docker stop frontend || true && sudo docker rm frontend || true
+
+            sudo docker run -d -p 5000:5000 --name backend ${BACKEND_IMAGE}:latest
+            sudo docker run -d -p 80:80 --name frontend ${FRONTEND_IMAGE}:latest

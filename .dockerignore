@@ -1,0 +1,32 @@
+# Node modules
+node_modules/
+
+# Git
+.git
+.gitignore
+
+# Logs
+*.log
+logs/
+
+# Env files (never copy secrets to container)
+.env
+.env.*
+
+# Build artifacts
+dist/
+build/
+out/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.vscode/
+.idea/
+
+# Local-only folders
+coverage/
+temp/
+.cache/
